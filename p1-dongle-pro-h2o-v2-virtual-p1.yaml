@@ -1,0 +1,395 @@
+# Based on https://github.com/mhendriks/esphome-p1/blob/main/p1-dongle-pro-h2o-v2.yaml
+
+substitutions:
+  device_name: p1-dongle-pro-h2o
+  device_description: "P1 Dongle Pro + H2O v2"
+  friendly_name: P1 Dongle Pro H2O
+  # Edit by TimSoethout
+  prj_version: "2024.7.1-virtual-p1"
+
+esphome:
+  name: ${device_name}
+  comment: "${device_description}" 
+  name_add_mac_suffix: false
+  project: 
+    name: "smartstuff.p1_dongle_pro_h2o_v2"
+    version: ${prj_version}
+  platformio_options:
+    upload_speed: 1500000
+    
+esp32:
+  board: esp32-c3-devkitm-1
+  
+improv_serial:
+  next_url: http://{{ip_address}}
+
+api:
+  services:
+    - service: p1_dongle_reboot
+      then:
+        - button.press:
+            id: reboot                        
+    - service: set_water_reading
+      variables:
+        meter_value: int
+      then:
+        - globals.set:
+            id: totalWaterUsage
+            value: !lambda "return ( meter_value );"                       
+
+globals:
+  - id: totalWaterUsage
+    type: int
+    restore_value: true      # aanpassen naar no indien de nieuwe waarde onder de oude ligt
+    initial_value: '0'       # beginstand van je watermeter -> aanpassen via Home Assistant services
+
+ota:
+  platform: esphome
+  
+captive_portal:
+web_server:
+# wifi:
+# # Enable fallback hotspot (captive portal) in case wifi connection fails
+#   ap:
+#     ssid: ${device_name}
+#     ap_timeout: 15s
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+
+  # Enable fallback hotspot (captive portal) in case wifi connection fails
+  ap:
+    ssid: ${device_name}
+    ap_timeout: 15s
+    password: !secret wifi_password
+
+
+# for use for adoption in ESPHome GUI in HA
+# dashboard_import:
+  # package_import_url: github://mhendriks/esphome-p1/p1-dongle-pro-h2o-v2.yaml@main
+
+# no longer needed was merged
+# external_components:
+# #   - source: my_components
+# #     components: [ dsmr ]
+# #   - source: github://mhendriks/esphome-p1@main
+# #     components: [dsmr]
+#   - source: github://pr#6841
+#     components: [dsmr]
+
+
+  
+# Enable logging
+logger:
+  # level: ERROR
+  tx_buffer_size: 1024
+
+dsmr:
+  uart_id: p1_uart
+  max_telegram_length: 1700
+uart:
+  - id: p1_uart
+    rx_pin:
+      number: 4
+      inverted: true
+    baud_rate: 115200
+    rx_buffer_size: 1700
+  - id: p1_bridge_uart
+    tx_pin:
+      number: 10
+    baud_rate: 115200
+  
+status_led:
+  pin:
+    number: 7
+    inverted: true
+    id: led 
+
+button:  
+  - platform: restart
+    name: "_Restart device"
+    id: reboot
+  - platform: factory_reset
+    name: "_Restart with Factory Default Settings"
+  - platform: template
+    name: "_Reset - Total Water Counter"
+    id: button_reset_total
+    on_press:
+      - globals.set:
+          id: totalWaterUsage
+          value: "0"      
+      
+binary_sensor:
+  - platform: gpio
+    pin:
+      number: 9
+      inverted: true
+      mode:
+        input: true
+        pullup: true
+    name: _PushButton
+    on_press:
+      then:
+        - button.press: reboot
+
+sensor:
+  - platform: pulse_counter
+    pin: 
+      number: 3
+      mode:
+        input: true
+        pullup: true
+    id: watermeter_pulse
+    name: "Watermeter pulse"
+    count_mode:
+      rising_edge: DISABLE
+      falling_edge: INCREMENT
+    state_class: measurement
+    update_interval: 1s
+    internal_filter: 13us
+    accuracy_decimals: 0
+    unit_of_measurement: 'L/min'
+    filters:
+      delta: 1
+  
+  - platform: template
+    name: "Watermeter total"
+    state_class: "total_increasing"
+    device_class: "water"
+    icon: mdi:water
+    update_interval: 1s
+    unit_of_measurement: L
+    accuracy_decimals: 0
+    lambda: |-
+      if (id(watermeter_pulse).state > 0) id(totalWaterUsage) += 1;
+      return id(totalWaterUsage);
+    filters:
+      delta: 1
+
+  - platform: dsmr
+#    energy_delivered_lux:
+#      name: "Energy Consumed Luxembourg"
+#      state_class: total_increasing
+    energy_delivered_tariff1:
+      name: "Energy Consumed Tariff 1"
+      state_class: total_increasing
+    energy_delivered_tariff2:
+      name: "Energy Consumed Tariff 2"
+      state_class: total_increasing
+#    energy_returned_lux:
+#      name: "Energy Produced Luxembourg"
+#      state_class: total_increasing
+    energy_returned_tariff1:
+      name: "Energy Produced Tariff 1"
+      state_class: total_increasing
+    energy_returned_tariff2:
+      name: "Energy Produced Tariff 2"
+      state_class: total_increasing
+    power_delivered:
+      name: "Power Consumed"
+      unit_of_measurement: "W"
+      state_class: "measurement"
+      accuracy_decimals: 0
+      filters:
+        - multiply: 1000
+    power_returned:
+      name: "Power Produced"
+      unit_of_measurement: "W"
+      state_class: "measurement"
+      accuracy_decimals: 0
+      filters:
+        - multiply: 1000
+    electricity_failures:
+      name: "Electricity Failures"
+      icon: mdi:alert
+    electricity_long_failures:
+      name: "Long Electricity Failures"
+      icon: mdi:alert
+    voltage_l1:
+      name: "Voltage Phase 1"
+    voltage_l2:
+      name: "Voltage Phase 2"
+    voltage_l3:
+      name: "Voltage Phase 3"
+    current_l1:
+      name: "Current Phase 1"
+    current_l2:
+      name: "Current Phase 2"
+    current_l3:
+      name: "Current Phase 3"
+    power_delivered_l1:
+      name: "Power Consumed Phase 1"
+      unit_of_measurement: "W"
+      state_class: "measurement"
+      accuracy_decimals: 0
+      filters:
+        - multiply: 1000
+    power_delivered_l2:
+      name: "Power Consumed Phase 2"
+      unit_of_measurement: "W"
+      state_class: "measurement"
+      accuracy_decimals: 0
+      filters:
+        - multiply: 1000
+    power_delivered_l3:
+      name: "Power Consumed Phase 3"
+      unit_of_measurement: "W"
+      state_class: "measurement"
+      accuracy_decimals: 0
+      filters:
+        - multiply: 1000
+    power_returned_l1:
+      name: "Power Produced Phase 1"
+      unit_of_measurement: "W"
+      state_class: "measurement"
+      accuracy_decimals: 0
+      filters:
+        - multiply: 1000
+    power_returned_l2:
+      name: "Power Produced Phase 2"
+      unit_of_measurement: "W"
+      state_class: "measurement"
+      accuracy_decimals: 0
+      filters:
+        - multiply: 1000
+    power_returned_l3:
+      name: "Power Produced Phase 3"
+      unit_of_measurement: "W"
+      state_class: "measurement"
+      accuracy_decimals: 0
+      filters:
+        - multiply: 1000
+    gas_delivered:
+      name: "Gas Consumed"
+      state_class: total_increasing
+    gas_delivered_be:
+      name: "Gas Consumed Belgium"
+      state_class: total_increasing
+  - platform: uptime
+    name: "_Uptime"
+  - platform: wifi_signal
+    name: "_Wi-Fi Signal"
+    update_interval: 60s
+      
+number:
+  # # import the virtual P1 sensor from Home Assistant
+  # - platform: homeassistant
+  #   # name: "Virtual P1 Power"
+  #   entity_id: input_number.virtual_p1_power
+  #   id: virtual_p1_power
+  # Number for virtual P1 power
+  - platform: template
+    name: "Virtual P1 Power"
+    id: virtual_p1_power
+    unit_of_measurement: "W"
+    device_class: power
+    min_value: -1000
+    max_value: 1000
+    step: 1
+    optimistic: true
+    initial_value: 0
+    # restore_value: true
+      
+
+text_sensor:
+  - platform: dsmr
+    telegram:
+      name: "telegram"
+      disabled_by_default: true
+      on_value:
+        then:
+          - lambda: |-
+              // get virtual_p1_power from sensor
+              float power = id(virtual_p1_power).state;
+
+              // convert power to string
+              std::string postive_power = (power > 0) ? std::to_string(power / 1000) : "0";
+              std::string negative_power = (power < 0) ? std::to_string(-power / 1000) : "0";
+
+              ESP_LOGV("dsrm", "power: %s", x.c_str());
+              ESP_LOGV("dsrm", "postive_power: %s ; negative_power: %s", postive_power.c_str(), negative_power.c_str());
+
+              // get telegram from input `x`, remove all characters after the last '!' 
+              std::string telegram = x.substr(0, x.find_last_of('!') + 1);
+
+              char buffer[256];
+              std::string modified_telegram;
+              const char* telegram_cstr = telegram.c_str();
+              const char* line_start = telegram_cstr;
+              const char* line_end;
+
+              while ((line_end = strstr(line_start, "\r\n")) != nullptr) {
+                size_t line_length = line_end - line_start;
+                std::string line(line_start, line_length);
+
+                if (line.find("1-0:1.7.0") != std::string::npos) {
+                  snprintf(buffer, sizeof(buffer), "1-0:1.7.0(%06.3f*kW)\r\n", std::stof(postive_power));
+                } else if (line.find("1-0:2.7.0") != std::string::npos) {
+                  snprintf(buffer, sizeof(buffer), "1-0:2.7.0(%06.3f*kW)\r\n", std::stof(negative_power));
+                } else if (line.find("1-0:21.7.0") != std::string::npos) {
+                  snprintf(buffer, sizeof(buffer), "1-0:21.7.0(%06.3f*kW)\r\n", std::stof(postive_power));
+                } else if (line.find("1-0:22.7.0") != std::string::npos) {
+                  snprintf(buffer, sizeof(buffer), "1-0:22.7.0(%06.3f*kW)\r\n", std::stof(negative_power));
+                } else {
+                  snprintf(buffer, sizeof(buffer), "%s\r\n", line.c_str());
+                }
+
+                modified_telegram += buffer;
+                line_start = line_end + 2;
+              }
+
+              // Ensure the modified telegram includes the '!'
+              modified_telegram += "!";
+
+              ESP_LOGV("dsrm", "modified_telegram: %s", modified_telegram.c_str());
+
+              telegram = modified_telegram;
+
+              // convert telegram into const uint8_t data[]
+              const uint8_t* telegram_unint8_t = reinterpret_cast<const uint8_t*>(telegram.c_str());
+
+
+              // inline function
+              // uint16_t calc_crc16_p1(const uint8_t* data, size_t length) {
+              const uint8_t* data = telegram_unint8_t;
+              size_t length = telegram.size();
+                uint16_t crc = 0x0000;
+                for (size_t pos = 0; pos < length; ++pos) {
+                  crc ^= data[pos];
+                  for (int i = 0; i < 8; ++i) {
+                    if ((crc & 0x0001) != 0) {
+                      crc >>= 1;
+                      crc ^= 0xA001;
+                    } else {
+                      crc >>= 1;
+                    }
+                  }
+                }
+              uint16_t crc_uint = crc;
+              
+              ESP_LOGV("dsrm", "telegram crc16: %X %u", crc_uint, crc_uint); 
+
+              // append crc16 checksum `crc_uint` to telegram
+              telegram.append(str_sprintf("%X", crc_uint));
+              telegram.append("\r\n");
+
+              ESP_LOGI("dsrm", "updated telegram: %s", telegram.c_str());
+              p1_bridge_uart->write_str(telegram.c_str());
+              // p1_bridge_uart->write_str(x.c_str());
+  - platform: dsmr
+    identification:
+      name: "DSMR Identification"
+    p1_version:
+      name: "DSMR Version"
+    p1_version_be:
+      name: "DSMR Version Belgium"
+  - platform: wifi_info
+    ip_address:
+      name: "_IP Address"
+    ssid:
+      name: "_Wi-Fi SSID"
+    bssid:
+      name: "_Wi-Fi BSSID"
+  - platform: version
+    name: "_ESPHome Version"
+    hide_timestamp: true

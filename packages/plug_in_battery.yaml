@@ -1,0 +1,39 @@
+# Example configuration entry
+input_number:
+  plug_in_battery_target_power:
+    name: "Plug-in Battery Target Power"
+    # initial: 0
+    min: -900
+    max: 900
+    step: 1
+    mode: box
+    unit_of_measurement: "W"
+
+automation:
+  - alias: "Set Virtual P1 according to Plug-in Battery Target Power"
+    id: "set_virtual_p1_power"
+    trigger:
+      - platform: state
+        entity_id:
+          - input_number.plug_in_battery_target_power
+          - sensor.plug_in_battery_power
+    variables:
+      plug_in_battery_target_power: "{{ states('input_number.plug_in_battery_target_power') | int(0) }}"
+      plug_in_battery_power: "{{ states('sensor.plug_in_battery_power') | int(0) }}"
+      # works both for plug_in_battery_target_power=0 or other value
+      # `/2` too avoid overshooting 
+      target_power: >
+            {{ (plug_in_battery_power - plug_in_battery_target_power) / 2 }}
+      # target_power: >
+      #       {{ -plug_in_battery_target_power if plug_in_battery_target_power != 0 else plug_in_battery_power }}
+    actions:
+      - action: logbook.log
+        data:
+          entity_id: "{{this.entity_id}}"
+          name: "Plug-in Battery Target Power"
+          message: "Setting P1 to {{ target_power }}; plug_in_battery_target_power = {{plug_in_battery_target_power}}, plug_in_battery_power = {{plug_in_battery_power}}"
+      - action: number.set_value
+        data:
+          value: "{{ target_power }}"
+        target:
+          entity_id: number.virtual_p1_power
