@@ -1,4 +1,4 @@
-# Homewizard Plug-in batterij dynamisch (ont)laden 
+# Homewizard Plug-in batterij dynamisch (ont)laden met "virtuele P1 provider"
 
 ## Waarom
 De [Homewizard Plugin-In thuisbatterij](https://www.homewizard.com/nl/plug-in-battery/) is net gelanceerd in Nederland. Vooralsnog is deze bedoeld om Nul op de Meter (NOM) te draaien. Via P1 uit de slimme meter ziet de [Homewizard P1 Meter](https://www.homewizard.com/nl/p1-meter/)-dongle hoeveel overproductie er is, en draagt de batterij op om dit overschot op te laden. Als er afname is van het stroomnet, zal deze juist ontladen. 
