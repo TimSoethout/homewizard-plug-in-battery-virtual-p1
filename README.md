@@ -1,5 +1,4 @@
-# homewizard-plug-in-battery-virtual-p1
-Resources to control (dis)charge of HomeWizard Plug-In battery.
+# Homewizard Plug-in batterij dynamisch (ont)laden 
 
 ## Waarom
 De [Homewizard Plugin-In thuisbatterij](https://www.homewizard.com/nl/plug-in-battery/) is net gelanceerd in Nederland. Vooralsnog is deze bedoeld om Nul op de Meter (NOM) te draaien. Via P1 uit de slimme meter ziet de [Homewizard P1 Meter](https://www.homewizard.com/nl/p1-meter/)-dongle hoeveel overproductie er is, en draagt de batterij op om dit overschot op te laden. Als er afname is van het stroomnet, zal deze juist ontladen. 
@@ -22,6 +21,14 @@ Dit is opgzet is `packages/plug_in_battery.yaml`, welke je in de gelijknamige di
 
 ## Vervolg
 Mijn vervolgstap is om met behulp van [Cheapest Energy Hours](https://github.com/TheFes/cheapest-energy-hours) en een automation de batterij automatisch op de 3,5 goedkoopste en duurste uren te laten laden en ontladen.
+
+## Demo
+
+https://vimeo.com/1064030293/3f3f958084
+
+![Controle vanuit HA](images/charge-kiezen-in-HA.png)
+
+![HW laad cyclus](images/HW-overview.png)
 
 ## Opmerkingen
 
